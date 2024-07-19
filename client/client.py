@@ -30,10 +30,10 @@ def check_privileges():
     # Vérification des privilèges administratifs
     if os.name == 'nt':
         try:
-            is_admin = os.getuid() == 0
-        except AttributeError:
             import ctypes
             is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
+        except AttributeError:
+            is_admin = os.getuid() == 0
     else:
         is_admin = os.geteuid() == 0
     return is_admin
@@ -125,7 +125,15 @@ class CLIENT:
         # Création d'un contexte SSL avec le protocole TLS v1.3
         context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         context.check_hostname = False
-        context.load_verify_locations(cafile="../certificate/server.crt")
+        
+        # Détection du système d'exploitation et définition du chemin du certificat
+        if os.name == 'nt':
+            cert_path = os.path.join(os.path.dirname(__file__), '..', 'certificate', 'server.crt')
+        else:
+            cert_path = os.path.join(os.path.dirname(__file__), '..', 'certificate', 'server.crt')
+        
+        context.load_verify_locations(cafile=cert_path)
+        
         while True:
             try:
                 with socket.create_connection((self.ipaddress, self.port)) as sock:
